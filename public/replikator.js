@@ -1,3 +1,4 @@
+import {connectionMode} from './connection-mode.js';
 import {setupGallery} from './replikator-gallery.js';
 import {livepeerRequest} from './prompt-agent.js?v=16';
 import {gtaStyle,validateProfiles} from './style-profiles.js';
@@ -8,7 +9,7 @@ const uuid=()=>crypto.randomUUID?.()||Array.from(crypto.getRandomValues(new Uint
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function setupReplikator({state,save,show,addToStoryboard}){
  const gallery=setupGallery({state,save,addToStoryboard});
- let working=false,polling=false,rate=null,draftAnchors=[],draftDescription='';
+ let working=false,polling=false,rate=null,pricingTask=null,draftAnchors=[],draftDescription='';
  const record=()=>state.replikator||(state.replikator={});
  const styles=()=>[{...gtaStyle,anchors:gtaAnchors},...(state.replikatorProfiles||[])];
  const selected=()=>styles().find(p=>p.id===state.replikatorStyle)||styles()[0];
@@ -25,32 +26,32 @@ export function setupReplikator({state,save,show,addToStoryboard}){
    if(job)r.lastError+=' Support reference: '+job+'.';
    try{await save();}catch{r.lastError+=' The reset could not be saved; keep this page open.';}
    status(r.lastError);
-  }else status(r.job_id?'Could not check the render. Click Retry / check generation to check the same job.':r.request_id?'Could not confirm the render. Click Retry / check generation to recover the same request.':message.slice(0,250));
+  }else if(error?.session)status(message);else status(r.job_id?'Could not check the render. Click Retry / check generation to check the same job.':r.request_id?'Could not confirm the render. Click Retry / check generation to recover the same request.':message.slice(0,250));
  }
  function draw(){
   const r=record(),style=selected(),locked=working||!!r.job_id;
-  $('replikatorStyles').innerHTML=styles().map(p=>`<button class="replikator-style" data-style="${esc(p.id)}" aria-pressed="${p.id===style.id}" ${locked?'disabled':''}>${p.anchors?.[0]?`<img src="${p.anchors[0]}" alt="">`:'<span class="replikator-profile-symbol" aria-hidden="true">◧</span>'}<strong>${esc(p.title)}</strong><small>${p.id==='gta-vi'?'In-game 3D · bloom':'Imported profile'}</small></button>`).join('')+`<button class="replikator-style add-style" id="addReplikatorStyle" ${locked?'disabled':''}><b aria-hidden="true">＋</b>Add style</button>`;
+  $('replikatorStyles').innerHTML=styles().map(p=>`<button class="replikator-style" data-style="${esc(p.id)}" aria-pressed="${p.id===style.id}" ${locked?'disabled':''}>${p.anchors?.[0]?`<img src="${p.anchors[0]}" alt="">`:'<span class="replikator-profile-symbol" aria-hidden="true">◧</span>'}<strong>${esc(p.title)}</strong><small>${p.id==='gta-vi'?'Stylized 3D · soft bloom':'Imported profile'}</small></button>`).join('')+`<button class="replikator-style add-style" id="addReplikatorStyle" ${locked?'disabled':''}><b aria-hidden="true">＋</b>Add style</button>`;
   $('replikatorStyleDescription').textContent=style.description||'Applies your imported visual profile while preserving the source scene.';
   for(const [id,src] of [['replikatorSource',r.source],['replikatorResult',gallery.source(r.url)||r.url]]){const im=$(id);im.hidden=!src;if(src)im.src=src;else im.removeAttribute('src');}
   $('replikatorResultTitle').textContent=(r.url?r.resultStyle||'Previous result':style.title)+' version';
-  $('replikatorPlaceholder').hidden=!!r.url;$('replikatorDownload').hidden=!r.url;if(r.url)$('replikatorDownload').href=gallery.source(r.url)||r.url;
-  $('replikateBtn').disabled=working||!r.source||(!r.job_id&&rate===null);
-  $('replikateBtn').textContent=working?'Replikating…':r.job_id||r.request_id?'Retry / check generation':'Replikate';
+  $('replikatorPlaceholder').hidden=!!r.url;$('replikatorDownload').hidden=!r.url;if(r.url)$('replikatorDownload').href=gallery.link(r.url);
+  $('replikateBtn').disabled=working||!r.source;
+  $('replikateBtn').textContent=working?'Replikating…':r.job_id||r.request_id?'Retry / check generation':rate===null?'Retry connection':'Replikate';
   $('resetReplikator').hidden=working||!(r.job_id||r.request_id);
   $('replikatorFile').disabled=locked;
  }
- async function pricing(){try{
+ function pricing(){if(pricingTask)return pricingTask;pricingTask=(async()=>{try{
   const response=await livepeerRequest('replikator-pricing',{});const row=response.data?.capabilities?.find(r=>r.name==='gpt-image-edit');
   if(typeof row?.display_price_usd!=='number'||row.unit_kind!=='image'||row.display_price_usd<=0||row.display_price_usd>0.75)throw Error('Image pricing is unavailable or exceeds the $0.75 limit.');
-  rate=row.display_price_usd;$('replikatorPrice').textContent=`Estimated $${rate.toFixed(3)} / image · usually 1–3 minutes · uses account credits`;
- }catch(e){rate=null;$('replikatorPrice').textContent=e.message;}draw();}
+  rate=row.display_price_usd;$('replikatorPrice').textContent=`Estimated $${rate.toFixed(3)} / image · usually 1–3 minutes · uses ${connectionMode()==='keyless'?'demo allowance':'account credits'}`;
+ }catch(e){rate=null;$('replikatorPrice').textContent=e.message;}finally{draw();}})().finally(()=>{pricingTask=null;});return pricingTask;}
  async function finish(data){
   const r=record(),url=data.url||data.run_output?.url;
   if(url){const u=new URL(url);if(u.protocol!=='https:')throw Error('Invalid image result URL.');r.url=u.href;r.resultStyle=r.pendingStyle||selected().title;r.job_id=null;r.request_id=null;r.request=null;r.completedAt=new Date().toISOString();await save();status('Saving your image to the gallery…');const archived=await gallery.add(r);status(archived?'Saved to the gallery below. Choose Save to storyboard to create video prompts.':'Image added below. Save its local copy before the provider link expires.');return true;}
   if(['failed','cancelled'].includes(data.status)){await failure(typeof data.error==='string'?data.error:data.error?.message||'Image generation failed.',true);return true;}return false;
  }
  async function poll(){if(polling)return;polling=true;working=true;draw();try{
-  for(let n=0;n<90;n++){const r=record();if(!r.job_id)break;status(`Creating your ${r.pendingStyle||selected().title} version… You can leave this page and return.`);const reply=await livepeerRequest('replikator-job',{job_id:r.job_id});if(await finish(reply.data||{}))break;await new Promise(resolve=>setTimeout(resolve,5000));}
+  for(let n=0;n<90;n++){const r=record();if(!r.job_id)break;status(`Creating your ${r.pendingStyle||selected().title} version… You can leave this page and return.`);const reply=await livepeerRequest('replikator-job',{job_id:r.job_id},r.authMode||'pymthouse');if(await finish(reply.data||{}))break;await new Promise(resolve=>setTimeout(resolve,5000));}
   if(record().job_id)status('Still rendering. Click Retry / check generation to check the same job without starting another render.');
  }catch(e){await failure(e);}finally{polling=false;working=false;draw();}}
  $('replikatorNav').onclick=()=>{show();draw();gallery.draw();pricing();if(record().job_id)poll();else if(record().url)gallery.add(record()).then(draw).catch(e=>status(e.message));};
@@ -78,7 +79,7 @@ export function setupReplikator({state,save,show,addToStoryboard}){
   const file=e.target.files[0];e.target.value='';if(!file)return;working=true;draw();try{const image=await prepareImage(file);state.replikator={source:image.data,dimensions:{width:image.width,height:image.height},name:file.name};await save();status('Reference ready. Click Replikate to apply '+selected().title+'.');}
   catch(e){status(e.message||'Could not save the reference.');}finally{working=false;draw();}
  };
- async function upload(data){const response=await livepeerRequest('upload',{data});if(!response.data?.url)throw Error('The upload did not return an image URL.');return response.data.url;}
+ async function upload(data){const response=await livepeerRequest('upload',{data},record().authMode||connectionMode());if(!response.data?.url)throw Error('The upload did not return an image URL.');return response.data.url;}
  $('resetReplikator').onclick=async()=>{
   if(working)return;
   if(!window.confirm('Release this request so you can change the reference or style? This does not cancel a render at Livepeer. If it is still running, it may finish and use credits. No new render will start until you click Replikate.'))return;
@@ -92,15 +93,17 @@ export function setupReplikator({state,save,show,addToStoryboard}){
  $('replikateBtn').onclick=async()=>{
   if(working)return;if(record().job_id){await poll();return;}working=true;draw();try{
    const r=record(),style=selected();if(!r.source)throw Error('Upload a reference first.');
-   if(!r.request){status('Uploading your reference and style anchors…');r.source_url||=await upload(r.source);
-    state.replikatorAnchorCache||={};const cacheKey=style.id+':'+(style.revision||1);let anchor_urls=state.replikatorAnchorCache[cacheKey];
+   if(!r.request){await pricing();if(rate===null)throw Error('Could not confirm the image price. Click Retry connection to try again. No render was started.');r.authMode=connectionMode();r.source_url=null;status('Uploading your reference and style anchors…');r.source_url||=await upload(r.source);
+    state.replikatorAnchorCache||={};const cacheKey=r.authMode+':'+style.id+':'+(style.revision||1);let anchor_urls=state.replikatorAnchorCache[cacheKey];
     if(!anchor_urls){anchor_urls=[];for(const anchor of style.anchors||[])anchor_urls.push(await upload(anchor));state.replikatorAnchorCache[cacheKey]=anchor_urls;}
     r.request_id=uuid();r.pendingStyle=style.title;
     r.request={profile:style.id,...(style.id!=='gta-vi'?{custom_profile:{...style,anchors:[]}}:{}),source_url:r.source_url,dimensions:r.dimensions,anchor_urls,request_id:r.request_id,confirm:true};await save();
    }
-   status('Applying '+r.pendingStyle+' with the image editor…');const reply=await livepeerRequest('replikate',r.request);if(await finish(reply.data||{}))return;
+   status('Applying '+r.pendingStyle+' with the image editor…');const reply=await livepeerRequest('replikate',r.request,r.authMode||'pymthouse');if(await finish(reply.data||{}))return;
    const job=reply.data?.job_id;if(!/^mjob_[a-z0-9]{6,32}$/.test(job||''))throw Error(reply.data?.human_summary||'Livepeer did not return an image job. Retry to check this request.');r.job_id=job;await save();await poll();
   }catch(e){await failure(e);}finally{working=false;draw();}
  };
+ window.addEventListener('online',()=>{if(!working)pricing();});
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!working)pricing();});
  draw();
 }
