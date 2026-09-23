@@ -4,7 +4,7 @@ Worklow is a creative workspace for filmmakers and AI artists. Turn a reference 
 
 **Live application:** https://ayomide-frameflow.ayomidedaniels-eth.chatgpt.site
 
-The hosted app is currently private. Reviewers need an invitation from the owner; this repository does not grant app access. You can also run your own local copy below.
+The hosted app is publicly accessible for judging. Anyone with the link can open it. You can also run your own local copy below.
 
 ## Try the complete workflow
 
@@ -18,7 +18,7 @@ The hosted app is currently private. Reviewers need an invitation from the owner
 
 Worklow generates styled images and prompts. It does not render video or submit prompts directly to Midjourney, MiniMax, Kling, or Seedance.
 
-Other features include video frame extraction, storyboard projects and folders, a reference library, custom Midjourney style codes and thumbnails, and reusable style profiles imported from JSON, Markdown, TXT, ZIP or .skill files. Style profiles and gallery items added by users live in their browser, not in this repository. The creator tested importing a custom LEGO profile; it is not a built-in style in a fresh installation.
+Other features include video frame extraction, storyboard projects and folders, a reference library, custom Midjourney style codes and thumbnails, and reusable style profiles imported from JSON, Markdown, TXT, ZIP or .skill files. Style profiles and gallery items added by users live in their browser, not in this repository. GTA VI and LEGO are built-in styles, available immediately in a fresh installation. LEGO includes a visual reference and instructions for minifigure anatomy, brick-built environments and cinematic plastic materials. Imported styles remain available alongside the built-in presets.
 
 ## Run locally
 
@@ -107,6 +107,8 @@ The creator has manually reported successful analysis, prompt generation, restyl
 | --- | --- |
 | `public/app.js` | Workspace, storyboard and main interface |
 | `public/replikator.js` | Style selection, upload, pricing and render lifecycle |
+| `public/lego-anchors.js` | Built-in LEGO visual reference |
+| `public/style-profiles.js` | Built-in style instructions and composition rules |
 | `public/profile-import.js` | Custom profile and skill-package import |
 | `public/replikator-gallery.js` | Generated-image gallery, local downloads and storyboard transfer |
 | `public/prompt-agent.js` | Analysis/prompt requests and bounded read recovery |

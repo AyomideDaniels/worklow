@@ -1,8 +1,9 @@
 import {connectionMode} from './connection-mode.js';
 import {setupGallery} from './replikator-gallery.js';
 import {livepeerRequest} from './prompt-agent.js?v=16';
-import {gtaStyle,validateProfiles} from './style-profiles.js';
+import {gtaStyle,legoStyle,validateProfiles} from './style-profiles.js';
 import {gtaAnchors} from './gta-anchors.js';
+import {legoAnchors} from './lego-anchors.js';
 import {parseProfileFiles,prepareImage} from './profile-import.js';
 const $=id=>document.getElementById(id);
 const uuid=()=>crypto.randomUUID?.()||Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('');
@@ -11,7 +12,7 @@ export function setupReplikator({state,save,show,addToStoryboard}){
  const gallery=setupGallery({state,save,addToStoryboard});
  let working=false,polling=false,rate=null,pricingTask=null,draftAnchors=[],draftDescription='';
  const record=()=>state.replikator||(state.replikator={});
- const styles=()=>[{...gtaStyle,anchors:gtaAnchors},...(state.replikatorProfiles||[])];
+ const styles=()=>[{...gtaStyle,anchors:gtaAnchors},{...legoStyle,anchors:legoAnchors},...(state.replikatorProfiles||[])];
  const selected=()=>styles().find(p=>p.id===state.replikatorStyle)||styles()[0];
  const status=text=>$('replikatorStatus').textContent=text;
  async function failure(error,terminal=false){
@@ -30,7 +31,7 @@ export function setupReplikator({state,save,show,addToStoryboard}){
  }
  function draw(){
   const r=record(),style=selected(),locked=working||!!r.job_id;
-  $('replikatorStyles').innerHTML=styles().map(p=>`<button class="replikator-style" data-style="${esc(p.id)}" aria-pressed="${p.id===style.id}" ${locked?'disabled':''}>${p.anchors?.[0]?`<img src="${p.anchors[0]}" alt="">`:'<span class="replikator-profile-symbol" aria-hidden="true">◧</span>'}<strong>${esc(p.title)}</strong><small>${p.id==='gta-vi'?'Stylized 3D · soft bloom':'Imported profile'}</small></button>`).join('')+`<button class="replikator-style add-style" id="addReplikatorStyle" ${locked?'disabled':''}><b aria-hidden="true">＋</b>Add style</button>`;
+  $('replikatorStyles').innerHTML=styles().map(p=>`<button class="replikator-style" data-style="${esc(p.id)}" aria-pressed="${p.id===style.id}" ${locked?'disabled':''}>${p.anchors?.[0]?`<img src="${p.anchors[0]}" alt="">`:'<span class="replikator-profile-symbol" aria-hidden="true">◧</span>'}<strong>${esc(p.title)}</strong><small>${p.id==='gta-vi'?'Stylized 3D · soft bloom':p.id==='lego'?'Brick-built · cinematic plastic':'Imported profile'}</small></button>`).join('')+`<button class="replikator-style add-style" id="addReplikatorStyle" ${locked?'disabled':''}><b aria-hidden="true">＋</b>Add style</button>`;
   $('replikatorStyleDescription').textContent=style.description||'Applies your imported visual profile while preserving the source scene.';
   for(const [id,src] of [['replikatorSource',r.source],['replikatorResult',gallery.source(r.url)||r.url]]){const im=$(id);im.hidden=!src;if(src)im.src=src;else im.removeAttribute('src');}
   $('replikatorResultTitle').textContent=(r.url?r.resultStyle||'Previous result':style.title)+' version';
@@ -97,7 +98,7 @@ export function setupReplikator({state,save,show,addToStoryboard}){
     state.replikatorAnchorCache||={};const cacheKey=r.authMode+':'+style.id+':'+(style.revision||1);let anchor_urls=state.replikatorAnchorCache[cacheKey];
     if(!anchor_urls){anchor_urls=[];for(const anchor of style.anchors||[])anchor_urls.push(await upload(anchor));state.replikatorAnchorCache[cacheKey]=anchor_urls;}
     r.request_id=uuid();r.pendingStyle=style.title;
-    r.request={profile:style.id,...(style.id!=='gta-vi'?{custom_profile:{...style,anchors:[]}}:{}),source_url:r.source_url,dimensions:r.dimensions,anchor_urls,request_id:r.request_id,confirm:true};await save();
+    r.request={profile:style.id,...(!['gta-vi','lego'].includes(style.id)?{custom_profile:{...style,anchors:[]}}:{}),source_url:r.source_url,dimensions:r.dimensions,anchor_urls,request_id:r.request_id,confirm:true};await save();
    }
    status('Applying '+r.pendingStyle+' with the image editor…');const reply=await livepeerRequest('replikate',r.request,r.authMode||'pymthouse');if(await finish(reply.data||{}))return;
    const job=reply.data?.job_id;if(!/^mjob_[a-z0-9]{6,32}$/.test(job||''))throw Error(reply.data?.human_summary||'Livepeer did not return an image job. Retry to check this request.');r.job_id=job;await save();await poll();

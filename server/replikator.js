@@ -1,9 +1,9 @@
-import {gtaStyle,makeStylePrompt,validateProfiles} from './style-profiles.js';
+import {gtaStyle,legoStyle,makeStylePrompt,validateProfiles} from './style-profiles.js';
 export const replikatorModel='gpt-image-edit';
 export async function replikator(body,call){
  if(body.confirm!==true)throw Error('Click Replikate to use account credits.');
  if(!/^[A-Za-z0-9_-]{1,128}$/.test(body.request_id||''))throw Error('Missing generation request ID.');
- const style=body.profile==='gta-vi'?gtaStyle:validateProfiles([body.custom_profile])[0];
+ const style=body.profile==='gta-vi'?gtaStyle:body.profile==='lego'?legoStyle:validateProfiles([body.custom_profile])[0];
  const source=new URL(body.source_url);if(source.protocol!=='https:')throw Error('Upload a valid reference first.');
  const anchors=body.anchor_urls||[];if(!Array.isArray(anchors)||anchors.length>2)throw Error('Use up to two style references.');
  for(const url of anchors){if(typeof url!=='string'||url.length>2000||new URL(url).protocol!=='https:')throw Error('Invalid style reference.');}
