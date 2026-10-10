@@ -146,3 +146,23 @@ try{const code=normalizeStyle($('customStyleCode').value);if(!customThumbnail)th
 $('backToFolders').onclick=()=>{activeFolder=null;render();};
 $('folderTitle').oninput=()=>{const f=(project().folders||[]).find(f=>f.id===activeFolder);if(!f)return;f.title=$('folderTitle').value.slice(0,200)||'Storyboard folder';$('crumb').textContent=project().title+' / '+f.title;renderProjectNav();save();};
 function migrateExtractedFolders(){let changed=false;for(const p of state.projects){p.folders||=[];const sources=new Map();for(const s of p.shots){if(s.folderId)continue;const m=typeof s.notes==='string'&&s.notes.match(/^Source: (.+) · [0-9.]+ seconds$/);if(!m)continue;let f=sources.get(m[1]);if(!f){f={id:uuid(),title:m[1].replace(/\.[^.]+$/,'')+' — Storyboard'};p.folders.push(f);sources.set(m[1],f)}s.folderId=f.id;changed=true;}}return changed;}
+
+// Embedded Image Canvas is isolated from storyboard drag/drop and uses its own IndexedDB.
+const canvasNav=document.getElementById('canvasNav');
+const canvasMain=document.getElementById('canvasMain');
+const canvasFrame=document.getElementById('canvasFrame');
+if(canvasNav&&canvasMain&&canvasFrame){
+  canvasNav.addEventListener('click',()=>{
+    document.querySelectorAll('.shell > main').forEach(el=>el.hidden=true);
+    document.querySelectorAll('.sidebar .nav').forEach(el=>el.classList.remove('active'));
+    canvasMain.hidden=false;
+    canvasNav.classList.add('active');
+    document.getElementById('crumb').textContent='Image Canvas';
+    if(!canvasFrame.getAttribute('src'))canvasFrame.src=canvasFrame.dataset.src;
+  });
+  document.querySelectorAll('.sidebar .nav:not(#canvasNav)').forEach(btn=>btn.addEventListener('click',()=>{
+    canvasMain.hidden=true;canvasNav.classList.remove('active');
+  }));
+  document.getElementById('projects')?.addEventListener('click',()=>{canvasMain.hidden=true;canvasNav.classList.remove('active')});
+  document.getElementById('storyboardGrid')?.addEventListener('click',()=>{canvasMain.hidden=true;canvasNav.classList.remove('active')});
+}
